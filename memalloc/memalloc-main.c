@@ -34,7 +34,7 @@
 
 /* Simple licensing stuff */
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("student");
+MODULE_AUTHOR("Lakshya Gupta, Aadeesh Sharma, Tathagat Panwar");
 MODULE_DESCRIPTION("Project 2, CSE 330 Spring 2024");
 MODULE_VERSION("0.01");
 
@@ -59,29 +59,93 @@ void    memalloc_pte_alloc(pmd_t* pmd, unsigned long vaddr);
     #define PAGE_PERMS_R		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_RDONLY)
 #endif
 
+/* Structures used to create a virtual device */
+static dev_t                dev = 0;
+static struct class*        memalloc_class;
+static struct cdev          memalloc_cdev;
+
 struct alloc_info           alloc_req;
 struct free_info            free_req;
 
 /* Init and Exit functions */
 static int __init memalloc_module_init(void) {
-    printk("Hello from the memalloc module!\n");
+    /* Allocate a character device. */
+    if (alloc_chrdev_region(&dev, 0, 1, "memalloc") < 0) {
+        printk("error: couldn't allocate chardev region.\n");
+        return -1;
+    }
+    printk("[*] Allocated chardev.\n");
+
+    /* Initialize the chardev with my fops. */
+    cdev_init(&memalloc_cdev, &fops);
+
+    if (cdev_add(&memalloc_cdev, dev, 1) < 0) {
+        printk("[x] Couldn't add memalloc cdev.\n");
+        goto cdevfailed;
+    }
+    printk("[*] Allocated cdev.\n");
+
+    if ((memalloc_class = class_create("memalloc_class")) == NULL) {
+        printk("[X] couldn't create class.\n");
+        goto cdevfailed;
+    }
+    printk("[*] Allocated class.\n");
+
+    if ((device_create(memalloc_class, NULL, dev, NULL, "memalloc")) == NULL) {
+        printk("[X] couldn't create device.\n");
+        goto classfailed;
+    }
+    printk("[*] Virtual device added.\n");
+
+    // printk("Hello from the memalloc module!\n");
     return 0;
+
+classfailed:
+    class_destroy(memalloc_class);
+cdevfailed:
+    unregister_chrdev_region(dev, 1);
+
+    return -1;
 }
 
 static void __exit memalloc_module_exit(void) {
+    /* Destroy the classes too (IOCTL-specific). */
+    if (memalloc_class) {
+        device_destroy(memalloc_class, dev);
+        class_destroy(memalloc_class);
+    }
+    cdev_del(&memalloc_cdev);
+    unregister_chrdev_region(dev,1);
+    printk("[*] Virtual device removed.\n");
+
     /* Teardown IOCTL */
-    printk("Goodbye from the memalloc module!\n");
+    // printk("Goodbye from the memalloc module!\n");
 }
 
 /* IOCTL handler for vmod. */
 static long memalloc_ioctl(struct file *f, unsigned int cmd, unsigned long arg) {
+    struct alloc_info alloc_req;
+    struct free_info free_req;
+
     switch (cmd)
     {
-    case ALLOCATE:    	
+    case ALLOCATE:
+        /* Copy data from user */
+    	if(copy_from_user((void*) &alloc_req, (void*)arg, sizeof(struct alloc_info))){
+    	    printk("Error: User didn't send right message.\n");
+            return -1;
+    	}
+
         /* allocate a set of pages */
         printk("IOCTL: alloc(%lx, %d, %d)\n", alloc_req.vaddr, alloc_req.num_pages, alloc_req.write);
         break;
-    case FREE:    	
+    case FREE:
+        /* Copy data from user */
+    	if(copy_from_user((void*) &free_req, (void*)arg, sizeof(struct free_info))){
+    	    printk("Error: User didn't send right message.\n");
+            return -1;
+    	}
+
         /* free allocated pages */
     	printk("IOCTL: free(%lx)\n", free_req.vaddr);
     	break;    	
