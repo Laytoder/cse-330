@@ -1,0 +1,7 @@
+// console
+Executing: TEST0
+[*] Device opened successfully
+
+// dmesg log
+IOCTL: alloc(10000000, 1, 1)
+IOCTL: free(10000000)

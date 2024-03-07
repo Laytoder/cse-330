@@ -1,0 +1,4 @@
+Executing: BTEST2
+Message from parent process: Hello World!
+Message from child process: Goodbye World!
+Passed: BTEST2
