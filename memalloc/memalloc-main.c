@@ -69,57 +69,16 @@ struct free_info            free_req;
 
 /* Init and Exit functions */
 static int __init memalloc_module_init(void) {
-    /* Allocate a character device. */
-    if (alloc_chrdev_region(&dev, 0, 1, "memalloc") < 0) {
-        printk("error: couldn't allocate chardev region.\n");
-        return -1;
-    }
-    printk("[*] Allocated chardev.\n");
-
-    /* Initialize the chardev with my fops. */
-    cdev_init(&memalloc_cdev, &fops);
-
-    if (cdev_add(&memalloc_cdev, dev, 1) < 0) {
-        printk("[x] Couldn't add memalloc cdev.\n");
-        goto cdevfailed;
-    }
-    printk("[*] Allocated cdev.\n");
-
-    if ((memalloc_class = class_create("memalloc_class")) == NULL) {
-        printk("[X] couldn't create class.\n");
-        goto cdevfailed;
-    }
-    printk("[*] Allocated class.\n");
-
-    if ((device_create(memalloc_class, NULL, dev, NULL, "memalloc")) == NULL) {
-        printk("[X] couldn't create device.\n");
-        goto classfailed;
-    }
-    printk("[*] Virtual device added.\n");
-
-    // printk("Hello from the memalloc module!\n");
+    if (!memalloc_ioctl_init()) return -1;
+    printk("Hello from the memalloc module!\n");
     return 0;
-
-classfailed:
-    class_destroy(memalloc_class);
-cdevfailed:
-    unregister_chrdev_region(dev, 1);
-
-    return -1;
 }
 
 static void __exit memalloc_module_exit(void) {
     /* Destroy the classes too (IOCTL-specific). */
-    if (memalloc_class) {
-        device_destroy(memalloc_class, dev);
-        class_destroy(memalloc_class);
-    }
-    cdev_del(&memalloc_cdev);
-    unregister_chrdev_region(dev,1);
-    printk("[*] Virtual device removed.\n");
-
     /* Teardown IOCTL */
-    // printk("Goodbye from the memalloc module!\n");
+    memalloc_ioctl_teardown();
+    printk("Goodbye from the memalloc module!\n");
 }
 
 /* IOCTL handler for vmod. */
@@ -165,11 +124,53 @@ static struct file_operations fops =
 
 /* Initialize the module for IOCTL commands */
 bool memalloc_ioctl_init(void) {
+    /* Allocate a character device. */
+    if (alloc_chrdev_region(&dev, 0, 1, "memalloc") < 0) {
+        printk("error: couldn't allocate chardev region.\n");
+        return false;
+    }
+    printk("[*] Allocated chardev.\n");
+
+    /* Initialize the chardev with my fops. */
+    cdev_init(&memalloc_cdev, &fops);
+
+    if (cdev_add(&memalloc_cdev, dev, 1) < 0) {
+        printk("[x] Couldn't add memalloc cdev.\n");
+        goto cdevfailed;
+    }
+    printk("[*] Allocated cdev.\n");
+
+    if ((memalloc_class = class_create("memalloc_class")) == NULL) {
+        printk("[X] couldn't create class.\n");
+        goto cdevfailed;
+    }
+    printk("[*] Allocated class.\n");
+
+    if ((device_create(memalloc_class, NULL, dev, NULL, "memalloc")) == NULL) {
+        printk("[X] couldn't create device.\n");
+        goto classfailed;
+    }
+    printk("[*] Virtual device added.\n");
+
+    return true;
+
+classfailed:
+    class_destroy(memalloc_class);
+cdevfailed:
+    unregister_chrdev_region(dev, 1);
+
     return false;
 }
 
 void memalloc_ioctl_teardown(void) {
     /* Destroy the classes too (IOCTL-specific). */
+    if (memalloc_class) {
+        device_destroy(memalloc_class, dev);
+        class_destroy(memalloc_class);
+    }
+    cdev_del(&memalloc_cdev);
+    unregister_chrdev_region(dev,1);
+    printk("[*] Virtual device removed.\n");
 }
 
 module_init(memalloc_module_init);
