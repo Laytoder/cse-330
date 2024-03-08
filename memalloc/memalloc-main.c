@@ -138,6 +138,7 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd, unsigned long arg) 
         printk("Error: incorrect IOCTL command.\n");
         return -1;
     }
+    printk("reached here insane");
     return 0;
 }
 
