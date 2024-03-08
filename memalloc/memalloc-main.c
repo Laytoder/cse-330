@@ -113,16 +113,11 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd, unsigned long arg) 
             for (int i = 0; i < alloc_req.num_pages; i++) {
                 if (total_pages == MAX_PAGES) return -2;
                 if (!pagewalk(vaddr, alloc_req.write)) return -1;
-                printk("reached after pagewalk \n");
                 total_pages++;
                 vaddr += 4096;
             }
 
-            printk("reached here 1");
-
             allocations++;
-
-            printk("reached here 2");
             
             break;
         }
@@ -144,7 +139,6 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd, unsigned long arg) 
             return -1;
         }
     }
-    printk("reached here insane");
     return 0;
 }
 
@@ -280,15 +274,11 @@ createPage:
     // Get the physical address of the page
     unsigned long paddr = __pa(virt_addr);
 
-    printk("Reached before set pte \n");
-
     if (write) {
         set_pte_at(current->mm, vaddr, pte, pfn_pte((paddr >> PAGE_SHIFT), PAGE_PERMS_RW));
     } else {
         set_pte_at(current->mm, vaddr, pte, pfn_pte((paddr >> PAGE_SHIFT), PAGE_PERMS_R));
     }
-
-    printk("Reached after set pte \n");
 
     return true;
 }
