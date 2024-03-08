@@ -258,7 +258,8 @@ bool pagewalk(unsigned long vaddr) {
     pte = pte_offset_kernel(pmd, vaddr);
     if (pte_none(*pte)) {
         printk("No PTE allocated; page must be unmapped.");
-        goto createPage;
+        return false;
+        // goto createPage;
     }
     printk("PTE is allocated. \n");
 
