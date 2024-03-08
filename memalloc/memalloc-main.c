@@ -117,7 +117,11 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd, unsigned long arg) 
             vaddr += 4096;
         }
 
+        printk("reached here 1");
+
         allocations++;
+
+        printk("reached here 2");
         
         break;
     case FREE:
