@@ -95,48 +95,54 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd, unsigned long arg) 
 
     switch (cmd)
     {
-    case ALLOCATE:
-        /* Copy data from user */
-    	if(copy_from_user((void*) &alloc_req, (void*)arg, sizeof(struct alloc_info))){
-    	    printk("Error: User didn't send right message.\n");
-            return -1;
-    	}
+        case ALLOCATE:
+        {
+            /* Copy data from user */
+            if(copy_from_user((void*) &alloc_req, (void*)arg, sizeof(struct alloc_info))){
+                printk("Error: User didn't send right message.\n");
+                return -1;
+            }
 
-        /* allocate a set of pages */
-        printk("IOCTL: alloc(%lx, %d, %d)\n", alloc_req.vaddr, alloc_req.num_pages, alloc_req.write);
+            /* allocate a set of pages */
+            printk("IOCTL: alloc(%lx, %d, %d)\n", alloc_req.vaddr, alloc_req.num_pages, alloc_req.write);
 
-        if (allocations == MAX_ALLOCATIONS) return -3;
-        
-        unsigned long vaddr = alloc_req.vaddr;
+            if (allocations == MAX_ALLOCATIONS) return -3;
+            
+            unsigned long vaddr = alloc_req.vaddr;
 
-        for (int i = 0; i < alloc_req.num_pages; i++) {
-            if (total_pages == MAX_PAGES) return -2;
-            if (!pagewalk(vaddr)) return -1;
-            printk("reached after pagewalk \n");
-            total_pages++;
-            vaddr += 4096;
+            for (int i = 0; i < alloc_req.num_pages; i++) {
+                if (total_pages == MAX_PAGES) return -2;
+                if (!pagewalk(vaddr)) return -1;
+                printk("reached after pagewalk \n");
+                total_pages++;
+                vaddr += 4096;
+            }
+
+            printk("reached here 1");
+
+            allocations++;
+
+            printk("reached here 2");
+            
+            break;
         }
+        case FREE:
+        {
+            /* Copy data from user */
+            if(copy_from_user((void*) &free_req, (void*)arg, sizeof(struct free_info))){
+                printk("Error: User didn't send right message.\n");
+                return -1;
+            }
 
-        printk("reached here 1");
-
-        allocations++;
-
-        printk("reached here 2");
-        
-        break;
-    case FREE:
-        /* Copy data from user */
-    	if(copy_from_user((void*) &free_req, (void*)arg, sizeof(struct free_info))){
-    	    printk("Error: User didn't send right message.\n");
+            /* free allocated pages */
+            printk("IOCTL: free(%lx)\n", free_req.vaddr);
+            break;    
+        }	
+        default:
+        {
+            printk("Error: incorrect IOCTL command.\n");
             return -1;
-    	}
-
-        /* free allocated pages */
-    	printk("IOCTL: free(%lx)\n", free_req.vaddr);
-    	break;    	
-    default:
-        printk("Error: incorrect IOCTL command.\n");
-        return -1;
+        }
     }
     printk("reached here insane");
     return 0;
