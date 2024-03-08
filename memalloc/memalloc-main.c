@@ -112,6 +112,7 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd, unsigned long arg) 
         for (int i = 0; i < alloc_req.num_pages; i++) {
             if (total_pages == MAX_PAGES) return -2;
             if (!pagewalk(vaddr)) return -1;
+            printk("reached after pagewalk \n");
             total_pages++;
             vaddr += 4096;
         }
