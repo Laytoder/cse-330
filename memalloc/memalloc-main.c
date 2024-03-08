@@ -42,6 +42,9 @@ MODULE_VERSION("0.01");
 bool memalloc_ioctl_init(void);
 void memalloc_ioctl_teardown(void);
 
+/* Call for pagewalk */
+bool pagewalk(unsigned long vaddr);
+
 /* Project 2 Solution Variable/Struct Declarations */
 #define MAX_PAGES           4096
 #define MAX_ALLOCATIONS     100
@@ -97,6 +100,14 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd, unsigned long arg) 
 
         /* allocate a set of pages */
         printk("IOCTL: alloc(%lx, %d, %d)\n", alloc_req.vaddr, alloc_req.num_pages, alloc_req.write);
+        
+        unsigned long vaddr = alloc_req.vaddr;
+
+        for (int i = 0; i < alloc_req.num_pages; i++) {
+            if (!pagewalk(vaddr)) return -1;
+            vaddr += 4096;
+        }
+        
         break;
     case FREE:
         /* Copy data from user */
@@ -171,6 +182,85 @@ void memalloc_ioctl_teardown(void) {
     cdev_del(&memalloc_cdev);
     unregister_chrdev_region(dev,1);
     printk("[*] Virtual device removed.\n");
+}
+
+bool pagewalk(unsigned long vaddr) {
+    pgd_t *pgd;
+    p4d_t *p4d;
+    pud_t *pud;
+    pmd_t *pmd;
+    pte_t *pte;
+
+    /* Return pointer of the PGD. mm is the mm_struct of the process, address is the logical 
+       address in the virtual memory space*/
+    pgd = pgd_offset(current->mm, vaddr);
+    if (pgd_none(*pgd)) {
+        printk("Error: pgd should always be mapped (something is really wrong!).\n");
+        return false;
+    }
+    printk("PGD is allocated. \n");
+
+    /* Return pointer to the P4D. pgd is the pointer of PGD, address is the logical address in 
+       the virtual memory space.*/
+    p4d = p4d_offset(pgd, vaddr);
+    if (p4d_none(*p4d) || p4d_bad(*p4d)) {
+        printk("No P4D allocated; page must be unmapped.");
+        memalloc_pud_alloc(p4d, vaddr);
+        p4d = p4d_offset(pgd, vaddr);
+    }
+    printk("P4D is allocated. \n");
+
+    /* Return pointer to the PUD. p4d is the pointer of P4D, address is the logical address in 
+       the virtual memory space.*/
+    pud = pud_offset(p4d, vaddr);
+    if (pud_none(*pud)) {
+        printk("No PUD allocated; page must be unmapped.");
+        memalloc_pmd_alloc(pud, vaddr);
+        pud = pud_offset(p4d, vaddr);
+    }
+    printk("PUD is allocated. \n");
+
+
+    /* Return pointer to the PMD. pud is the pointer of PUD, address is the logical address in 
+       the virtual memory space.*/
+    pmd = pmd_offset(pud, vaddr);
+    if (pmd_none(*pmd)) {
+        printk("No PMD allocated; page must be unmapped.");
+        memalloc_pte_alloc(pmd, vaddr);
+        pmd = pmd_offset(pud, vaddr);
+    }
+    printk("PMD is allocated. \n");
+
+    /* Return pointer to the PTE. pmd is the pointer of PMD, address is the logical address in 
+       the virtual memory space*/
+    pte = pte_offset_kernel(pmd, vaddr);
+    if (pte_none(*pte)) {
+        printk("No PTE allocated; page must be unmapped.");
+        goto createPage;
+    }
+    printk("PTE is allocated. \n");
+
+    if (pte_present(*pte)) {
+    	printk("Page is mapped.");
+        return false;
+    }
+    
+createPage:
+    printk("Page is not mapped. \n");    // Get a free page for the process
+
+    gfp_t gfp = GFP_KERNEL_ACCOUNT;
+    void *virt_addr = (void*) get_zeroed_page(gfp);
+    if (!virt_addr) {
+        printk(KERN_ERR "Failed to allocate memory using vmalloc\n");
+        return -ENOMEM;
+    }
+
+    // Get the physical address of the page
+    unsigned long paddr = __pa(virt_addr);
+
+    set_pte_at(current->mm, vaddr, pte, pfn_pte((paddr >> PAGE_SHIFT), PAGE_PERMS_R));
+
+    return true;
 }
 
 module_init(memalloc_module_init);
