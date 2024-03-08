@@ -70,6 +70,10 @@ static struct cdev          memalloc_cdev;
 struct alloc_info           alloc_req;
 struct free_info            free_req;
 
+/* counters for total pages and allocations */
+int total_pages = 0;
+int allocations = 0;
+
 /* Init and Exit functions */
 static int __init memalloc_module_init(void) {
     if (!memalloc_ioctl_init()) return -1;
@@ -100,13 +104,19 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd, unsigned long arg) 
 
         /* allocate a set of pages */
         printk("IOCTL: alloc(%lx, %d, %d)\n", alloc_req.vaddr, alloc_req.num_pages, alloc_req.write);
+
+        if (allocations == MAX_ALLOCATIONS) return -3;
         
         unsigned long vaddr = alloc_req.vaddr;
 
         for (int i = 0; i < alloc_req.num_pages; i++) {
+            if (total_pages == MAX_PAGES) return -2;
             if (!pagewalk(vaddr)) return -1;
+            total_pages++;
             vaddr += 4096;
         }
+
+        allocations++;
         
         break;
     case FREE:
