@@ -268,7 +268,11 @@ createPage:
     // Get the physical address of the page
     unsigned long paddr = __pa(virt_addr);
 
+    printk("Reached before set pte \n");
+
     set_pte_at(current->mm, vaddr, pte, pfn_pte((paddr >> PAGE_SHIFT), PAGE_PERMS_R));
+
+    printk("Reached after set pte \n");
 
     return true;
 }
