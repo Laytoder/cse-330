@@ -43,7 +43,7 @@ bool memalloc_ioctl_init(void);
 void memalloc_ioctl_teardown(void);
 
 /* Call for pagewalk */
-bool pagewalk(unsigned long vaddr);
+bool pagewalk(unsigned long vaddr, bool write);
 
 /* Project 2 Solution Variable/Struct Declarations */
 #define MAX_PAGES           4096
@@ -112,7 +112,7 @@ static long memalloc_ioctl(struct file *f, unsigned int cmd, unsigned long arg) 
 
             for (int i = 0; i < alloc_req.num_pages; i++) {
                 if (total_pages == MAX_PAGES) return -2;
-                if (!pagewalk(vaddr)) return -1;
+                if (!pagewalk(vaddr, alloc_req.write)) return -1;
                 printk("reached after pagewalk \n");
                 total_pages++;
                 vaddr += 4096;
@@ -206,7 +206,7 @@ void memalloc_ioctl_teardown(void) {
     printk("[*] Virtual device removed.\n");
 }
 
-bool pagewalk(unsigned long vaddr) {
+bool pagewalk(unsigned long vaddr, bool write) {
     pgd_t *pgd;
     p4d_t *p4d;
     pud_t *pud;
@@ -258,8 +258,7 @@ bool pagewalk(unsigned long vaddr) {
     pte = pte_offset_kernel(pmd, vaddr);
     if (pte_none(*pte)) {
         printk("No PTE allocated; page must be unmapped.");
-        return false;
-        // goto createPage;
+        goto createPage;
     }
     printk("PTE is allocated. \n");
 
@@ -283,7 +282,11 @@ createPage:
 
     printk("Reached before set pte \n");
 
-    set_pte_at(current->mm, vaddr, pte, pfn_pte((paddr >> PAGE_SHIFT), PAGE_PERMS_R));
+    if (write) {
+        set_pte_at(current->mm, vaddr, pte, pfn_pte((paddr >> PAGE_SHIFT), PAGE_PERMS_RW));
+    } else {
+        set_pte_at(current->mm, vaddr, pte, pfn_pte((paddr >> PAGE_SHIFT), PAGE_PERMS_R));
+    }
 
     printk("Reached after set pte \n");
 
